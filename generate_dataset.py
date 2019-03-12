@@ -9,9 +9,15 @@ def build(dataset, width, height, train_portion):
     path = root + "/" + dataset + "/"
     directory = os.listdir(path)
 
+    # Get filenames from directory and sort
+    files = []
+    for file in directory:
+        files.append(file)
+    files.sort()
+
     # Resize images and add to list
     images = []
-    for file in directory:
+    for file in files:
         image = cv2.imread(path + file, 0)
         image = cv2.resize(image, (width, height))
         images.append(image)
