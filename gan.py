@@ -93,7 +93,7 @@ class GAN():
     def train(self, epochs, batch_size=128, sample_interval=50):
 
         # Generate the dataset
-        generate_dataset.build("cropped_sketch", 1)
+        generate_dataset.build("cropped_sketch", self.img_cols, self.img_rows, 1)
 
         # Load the dataset
         (X_train, _) = load_dataset.get("cropped_sketch")

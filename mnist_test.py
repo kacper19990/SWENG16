@@ -1,15 +1,15 @@
 from matplotlib import pyplot
-from scipy.misc import toimage
+from PIL import Image
 from keras.datasets import mnist
 
 
-def show_imgs(X):
+def show_images(x):
     pyplot.figure(1)
     k = 0
     for i in range(0, 4):
         for j in range(0, 4):
             pyplot.subplot2grid((4, 4), (i, j))
-            pyplot.imshow(toimage(X[k]))
+            pyplot.imshow(Image.fromarray(x[k], 'P'))
             k = k + 1
     pyplot.show()
 
@@ -21,4 +21,4 @@ print(x_test.shape)
 print(y_train.shape)
 print(y_test.shape)
 
-show_imgs(x_test[:16])
+show_images(x_test[:16])
