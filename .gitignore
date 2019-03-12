@@ -1,3 +1,6 @@
 venv/
 .idea/
 __pycache__/
+.idea/workspace.xml
+.idea/misc.xml
+.idea/SWENG16.iml
