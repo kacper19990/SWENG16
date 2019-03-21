@@ -1,0 +1,2 @@
+The first attempt made, based entirely off the basic gan implementation by keras.
+The resolution was too high, and all of the images came out worryingly similar in shape.

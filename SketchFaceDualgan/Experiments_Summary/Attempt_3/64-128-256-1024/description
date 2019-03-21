@@ -1,0 +1,11 @@
+Generator Structure: 4 layers of 64, 128, 512 and 1024 nodes respectively.
+Dicriminator Structure: 3 layers of 128, 512 and 1024 nodes respectively.
+
+Input size:	124 x 128 x 1
+Output size:	128 x 192 x 1
+
+All else as standard in keras gan.py example.
+
+Comments:
+After 30,000 epochs, can produce some very good images, but very inconsistently.  Discriminator gets very high accuracy, will try with fewer layers for discriminator and more for generator.
+After 50,000 epochs, is getting more consistent.  Still not at an acceptable level, but an improvement.

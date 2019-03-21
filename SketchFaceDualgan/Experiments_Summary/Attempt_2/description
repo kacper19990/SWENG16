@@ -1,0 +1,3 @@
+These were all fairly similar experiments, all run quite briefly.  The resolution was lowered since the first attempt, which has helped keep them from all being the same.
+Each has one or two variables changed from the 'standard', which is the keras example.
+Each of the models was run for a different number of epochs.  The number of the foder housing the outputs is the number of epochs the model was trained to get those outputs.
