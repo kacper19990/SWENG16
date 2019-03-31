@@ -3,7 +3,7 @@ import os
 import cv2
 
 
-def build(dataset, width, height, train_portion):
+def generate(dataset, width, height, train_portion):
     # Get filenames from directory and sort
     directory = os.listdir(dataset)
     files = []
@@ -27,3 +27,13 @@ def build(dataset, width, height, train_portion):
 
     # Save arrays as zip file
     np.savez(dataset, x_train, x_test)
+
+
+def load(dataset):
+    # Load arrays from file
+    f = np.load(dataset + ".npz")
+    x_train = f['arr_0.npy']
+    x_test = f['arr_1.npy']
+    f.close()
+
+    return x_train, x_test

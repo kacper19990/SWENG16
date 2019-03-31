@@ -1,5 +1,4 @@
-import generate_dataset
-import load_dataset
+import dataset
 from matplotlib import pyplot
 from PIL import Image
 
@@ -17,12 +16,12 @@ def show_images(x):
 
 
 # Generate a zip file containing train and test numpy arrays
-generate_dataset.build("sketches", 640, 800, 0.9)
-generate_dataset.build("pictures", 640, 800, 0.9)
+dataset.generate("sketches", 128, 192, 0.9)
+dataset.generate("pictures", 128, 192, 0.9)
 
 # Extract train and test numpy arrays
-x_train, x_test = load_dataset.get("sketches")
-y_train, y_test = load_dataset.get("pictures")
+x_train, x_test = dataset.load("sketches")
+y_train, y_test = dataset.load("pictures")
 
 # Check array dimensions
 print(x_train.shape)
