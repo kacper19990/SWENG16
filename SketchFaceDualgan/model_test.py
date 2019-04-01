@@ -26,6 +26,9 @@ def generate_samples(model_path, img_size, sample_size):
     # Generate samples
     gen_imgs = model.predict(sketches)
 
+    # Rescale images 0 - 1
+    gen_imgs = 0.5 * gen_imgs + 0.5
+
     # Make directory
     if not os.path.exists("model_results"):
         os.makedirs("model_results")
