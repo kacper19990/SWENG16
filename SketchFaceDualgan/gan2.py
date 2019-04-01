@@ -109,7 +109,6 @@ class GAN():
         Y_train = np.expand_dims(Y_train, axis=3)
 
         X_train = X_train.reshape(X_train.shape[0], self.img_size)
-        Y_train = Y_train.reshape(Y_train.shape[0], self.img_size)
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
@@ -150,25 +149,54 @@ class GAN():
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
-                self.sample_images(epoch)
+                self.sample_images(epoch, X_train, Y_train)
 
-    def sample_images(self, epoch):
-        r, c = 5, 5
-        noise = np.random.normal(0, 1, (r * c, self.img_shape))
-        gen_imgs = self.generator.predict(noise)
+    def sample_images(self, epoch, X_train, Y_train):
+        sample_size = 5
+
+        idx = np.random.randint(0, X_train.shape[0], sample_size)
+        sketches = X_train[idx]
+        pictures = Y_train[idx]
+
+        gen_imgs = self.generator.predict(sketches)
+
+        sketches = sketches.reshape(sample_size, self.img_rows, self.img_cols, self.channels)
 
         # Rescale images 0 - 1
         gen_imgs = 0.5 * gen_imgs + 0.5
 
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
-                axs[i,j].axis('off')
-                cnt += 1
-        fig.savefig("images/%d.png" % epoch)
-        plt.close()
+        if not os.path.exists('gan_results'):
+            os.makedirs('gan_results')
+
+        if not os.path.exists('gan_results/pictures'):
+            os.makedirs('gan_results/pictures')
+
+        if not os.path.exists('gan_results/sketches'):
+            os.makedirs('gan_results/sketches')
+
+        if not os.path.exists('gan_results/output'):
+            os.makedirs('gan_results/output')
+
+        if not os.path.exists('gan_results/pictures/' + str(epoch)):
+            os.makedirs('gan_results/pictures/' + str(epoch))
+
+        if not os.path.exists('gan_results/sketches/' + str(epoch)):
+            os.makedirs('gan_results/sketches/' + str(epoch))
+
+        if not os.path.exists('gan_results/output/' + str(epoch)):
+            os.makedirs('gan_results/output/' + str(epoch))
+
+        for i in range(len(sketches)):
+            img = image.array_to_img(sketches[i])
+            img.save('gan_results/sketches/' + str(epoch) + '/' + str(i) + '.png')
+
+        for i in range(len(pictures)):
+            img = image.array_to_img(pictures[i])
+            img.save('gan_results/pictures/' + str(epoch) + '/' + str(i) + '.png')
+
+        for i in range(len(gen_imgs)):
+            img = image.array_to_img(gen_imgs[i])
+            img.save('gan_results/output/' + str(epoch) + '/' + str(i) + '.png')
 
 
 if __name__ == '__main__':
