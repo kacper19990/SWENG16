@@ -150,9 +150,10 @@ class GAN:
             # Plot the progress
             print("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
-            # If at save interval => save generated image samples
+            # If at save interval => save generated image samples and models
             if epoch % sample_interval == 0:
                 self.sample_images(epoch, X_test, Y_test)
+                self.save_models(epoch)
 
     def sample_images(self, epoch, X_test, Y_test):
         sample_size = 32
@@ -193,6 +194,21 @@ class GAN:
         for i in range(len(gen_imgs)):
             img = image.array_to_img(gen_imgs[i])
             img.save('gan_results/output/' + str(epoch) + '/' + str(i) + '.png')
+
+    def save_models(self, epoch):
+        # Make directory
+        if not os.path.exists('gan_results/models/' + str(epoch)):
+            os.makedirs('gan_results/models/' + str(epoch))
+
+        generator_model = self.generator.to_json()
+        with open("gan_results/models/" + str(epoch) + "/generator.json", "w") as json_file:
+            json_file.write(generator_model)
+        self.generator.save_weights("gan_results/models/" + str(epoch) + "/generator.h5")
+
+        discriminator_model = self.discriminator.to_json()
+        with open("gan_results/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
+            json_file.write(discriminator_model)
+        self.generator.save_weights("gan_results/models/" + str(epoch) + "/discriminator.h5")
 
 
 if __name__ == '__main__':
