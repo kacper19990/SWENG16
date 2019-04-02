@@ -1,6 +1,7 @@
 from keras.preprocessing import image
 from keras.models import model_from_json
 
+import numpy as np
 import os
 import dataset
 
@@ -21,6 +22,7 @@ def generate_samples(model_path, rows, cols, channels, sample_size):
 
     # Resize dataset
     sketches = sketches / 127.5 - 1.
+    sketches = np.expand_dims(sketches, axis=3)
     sketches = sketches.reshape(sketches.shape[0], img_size)
 
     # Generate samples
@@ -30,16 +32,24 @@ def generate_samples(model_path, rows, cols, channels, sample_size):
     gen_imgs = 0.5 * gen_imgs + 0.5
 
     # Reshape images
+    sketches = sketches.reshape((sample_size, rows, cols, channels))
     gen_imgs = gen_imgs.reshape((sample_size, rows, cols, channels))
 
-    # Make directory
-    if not os.path.exists("model_results"):
-        os.makedirs("model_results")
+    # Make directories
+    if not os.path.exists("model_results/input"):
+        os.makedirs("model_results/input")
+
+    if not os.path.exists("model_results/output"):
+        os.makedirs("model_results/output")
 
     # Save images
+    for i in range(len(sketches)):
+        img = image.array_to_img(sketches[i])
+        img.save('model_results/input/' + str(i) + '.png')
+        
     for i in range(len(gen_imgs)):
         img = image.array_to_img(gen_imgs[i])
-        img.save('model_results/' + str(i) + '.png')
+        img.save('model_results/output/' + str(i) + '.png')
 
 
-generate_samples("dualgan_results/sketch2face/models/100/generator", 192, 128, 1, 32)
+generate_samples("gan_results/models/100/generator", 192, 128, 1, 32)
