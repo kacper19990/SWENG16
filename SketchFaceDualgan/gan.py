@@ -200,17 +200,17 @@ class GAN:
         if not os.path.exists('gan_results/models/' + str(epoch)):
             os.makedirs('gan_results/models/' + str(epoch))
 
-        generator_model = self.generator.to_json()
+        model = self.generator.to_json()
         with open("gan_results/models/" + str(epoch) + "/generator.json", "w") as json_file:
-            json_file.write(generator_model)
+            json_file.write(model)
         self.generator.save_weights("gan_results/models/" + str(epoch) + "/generator.h5")
 
-        discriminator_model = self.discriminator.to_json()
+        model = self.discriminator.to_json()
         with open("gan_results/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
-            json_file.write(discriminator_model)
+            json_file.write(model)
         self.generator.save_weights("gan_results/models/" + str(epoch) + "/discriminator.h5")
 
 
 if __name__ == '__main__':
     gan = GAN()
-    gan.train(epochs=100000, batch_size=32, sample_interval=1000)
+    gan.train(epochs=100000, batch_size=32, sample_interval=100)

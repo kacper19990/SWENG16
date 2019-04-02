@@ -192,6 +192,7 @@ class DUALGAN:
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.save_imgs(epoch, A_test, B_test)
+                self.save_models(epoch)
 
     def save_imgs(self, epoch, A_test, B_test):
         sample_size = 32
@@ -220,36 +221,78 @@ class DUALGAN:
         fake_B = fake_B.reshape((sample_size, self.img_rows, self.img_cols, self.channels))
 
         # Make directories
-        if not os.path.exists('dualgan_results/sketch2face_input/' + str(epoch)):
-            os.makedirs('dualgan_results/sketch2face_input/' + str(epoch))
+        if not os.path.exists('dualgan_results/sketch2face/sketches/' + str(epoch)):
+            os.makedirs('dualgan_results/sketch2face/sketches/' + str(epoch))
             
-        if not os.path.exists('dualgan_results/sketch2face_output/' + str(epoch)):
-            os.makedirs('dualgan_results/sketch2face_output/' + str(epoch))
+        if not os.path.exists('dualgan_results/sketch2face/pictures/' + str(epoch)):
+            os.makedirs('dualgan_results/sketch2face/pictures/' + str(epoch))
             
-        if not os.path.exists('dualgan_results/face2sketch_input/' + str(epoch)):
-            os.makedirs('dualgan_results/face2sketch_input/' + str(epoch))
+        if not os.path.exists('dualgan_results/sketch2face/output/' + str(epoch)):
+            os.makedirs('dualgan_results/sketch2face/output/' + str(epoch))
             
-        if not os.path.exists('dualgan_results/face2sketch_output/' + str(epoch)):
-            os.makedirs('dualgan_results/face2sketch_output/' + str(epoch))
+        if not os.path.exists('dualgan_results/face2sketch/pictures/' + str(epoch)):
+            os.makedirs('dualgan_results/face2sketch/pictures/' + str(epoch))
+
+        if not os.path.exists('dualgan_results/face2sketch/sketches/' + str(epoch)):
+            os.makedirs('dualgan_results/face2sketch/sketches/' + str(epoch))
+
+        if not os.path.exists('dualgan_results/face2sketch/output/' + str(epoch)):
+            os.makedirs('dualgan_results/face2sketch/output/' + str(epoch))
 
         # Save images
         for i in range(len(imgs_A)):
             img = image.array_to_img(imgs_A[i])
-            img.save('dualgan_results/sketch2face_input/' + str(epoch) + '/' + str(i) + '.png')
-
-        for i in range(len(fake_B)):
-            img = image.array_to_img(fake_B[i])
-            img.save('dualgan_results/sketch2face_output/' + str(epoch) + '/' + str(i) + '.png')
+            img.save('dualgan_results/sketch2face/sketches/' + str(epoch) + '/' + str(i) + '.png')
 
         for i in range(len(imgs_B)):
             img = image.array_to_img(imgs_B[i])
-            img.save('dualgan_results/face2sketch_input/' + str(epoch) + '/' + str(i) + '.png')
+            img.save('dualgan_results/sketch2face/pictures/' + str(epoch) + '/' + str(i) + '.png')
+
+        for i in range(len(fake_B)):
+            img = image.array_to_img(fake_B[i])
+            img.save('dualgan_results/sketch2face/output/' + str(epoch) + '/' + str(i) + '.png')
+
+        for i in range(len(imgs_B)):
+            img = image.array_to_img(imgs_B[i])
+            img.save('dualgan_results/face2sketch/pictures/' + str(epoch) + '/' + str(i) + '.png')
+            
+        for i in range(len(imgs_A)):
+            img = image.array_to_img(imgs_A[i])
+            img.save('dualgan_results/face2sketch/sketches/' + str(epoch) + '/' + str(i) + '.png')
 
         for i in range(len(fake_A)):
             img = image.array_to_img(fake_A[i])
-            img.save('dualgan_results/face2sketch_output/' + str(epoch) + '/' + str(i) + '.png')
+            img.save('dualgan_results/face2sketch/output/' + str(epoch) + '/' + str(i) + '.png')
+
+    def save_models(self, epoch):
+        # Make directories
+        if not os.path.exists('dualgan_results/sketch2face/models/' + str(epoch)):
+            os.makedirs('dualgan_results/sketch2face/models/' + str(epoch))
+
+        if not os.path.exists('dualgan_results/face2sketch/models/' + str(epoch)):
+            os.makedirs('dualgan_results/face2sketch/models/' + str(epoch))
+
+        model = self.G_AB.to_json()
+        with open("dualgan_results/sketch2face/models/" + str(epoch) + "/generator.json", "w") as json_file:
+            json_file.write(model)
+        self.G_AB.save_weights("dualgan_results/sketch2face/models/" + str(epoch) + "/generator.h5")
+
+        model = self.D_A.to_json()
+        with open("dualgan_results/sketch2face/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
+            json_file.write(model)
+        self.D_A.save_weights("dualgan_results/sketch2face/models/" + str(epoch) + "/discriminator.h5")
+
+        model = self.G_BA.to_json()
+        with open("dualgan_results/face2sketch/models/" + str(epoch) + "/generator.json", "w") as json_file:
+            json_file.write(model)
+        self.G_BA.save_weights("dualgan_results/face2sketch/models/" + str(epoch) + "/generator.h5")
+
+        model = self.D_B.to_json()
+        with open("dualgan_results/face2sketch/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
+            json_file.write(model)
+        self.D_B.save_weights("dualgan_results/face2sketch/models/" + str(epoch) + "/discriminator.h5")
 
 
 if __name__ == '__main__':
     gan = DUALGAN()
-    gan.train(epochs=100000, batch_size=32, sample_interval=1000)
+    gan.train(epochs=100000, batch_size=32, sample_interval=100)

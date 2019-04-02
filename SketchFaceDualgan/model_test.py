@@ -1,12 +1,13 @@
 from keras.preprocessing import image
 from keras.models import model_from_json
 
-import numpy as np
 import os
 import dataset
 
 
-def generate_samples(model_path, img_size, sample_size):
+def generate_samples(model_path, rows, cols, channels, sample_size):
+    img_size = rows * cols
+
     # Load model
     json_file = open(model_path + ".json", 'r')
     json_model = json_file.read()
@@ -20,7 +21,6 @@ def generate_samples(model_path, img_size, sample_size):
 
     # Resize dataset
     sketches = sketches / 127.5 - 1.
-    sketches = np.expand_dims(sketches, axis=3)
     sketches = sketches.reshape(sketches.shape[0], img_size)
 
     # Generate samples
@@ -28,6 +28,9 @@ def generate_samples(model_path, img_size, sample_size):
 
     # Rescale images 0 - 1
     gen_imgs = 0.5 * gen_imgs + 0.5
+
+    # Reshape images
+    gen_imgs = gen_imgs.reshape((sample_size, rows, cols, channels))
 
     # Make directory
     if not os.path.exists("model_results"):
@@ -39,4 +42,4 @@ def generate_samples(model_path, img_size, sample_size):
         img.save('model_results/' + str(i) + '.png')
 
 
-generate_samples("gan_results/models/100/generator", 192*128, 32)
+generate_samples("dualgan_results/sketch2face/models/100/generator", 192, 128, 1, 32)
