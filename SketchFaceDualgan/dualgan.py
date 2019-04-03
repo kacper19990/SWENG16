@@ -293,6 +293,10 @@ class DUALGAN:
         self.D_B.save_weights("dualgan_results/face2sketch/models/" + str(epoch) + "/discriminator.h5")
 
 
-if __name__ == '__main__':
+def test():
     gan = DUALGAN()
     gan.train(epochs=100000, batch_size=32, sample_interval=100)
+
+
+if __name__ == '__main__':
+    test()

@@ -223,6 +223,10 @@ class WGAN:
         self.critic.save_weights("wgan_results/models/" + str(epoch) + "/discriminator.h5")
 
 
-if __name__ == '__main__':
+def test():
     wgan = WGAN()
     wgan.train(epochs=100000, batch_size=32, sample_interval=100)
+
+
+if __name__ == '__main__':
+    test()
