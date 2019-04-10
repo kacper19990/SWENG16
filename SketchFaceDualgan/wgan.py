@@ -6,7 +6,7 @@ from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam
 
 import keras.backend as K
 
@@ -17,41 +17,37 @@ import os
 
 class WGAN:
     def __init__(self):
-        self.img_rows = 192
-        self.img_cols = 128
+        self.img_rows = 96
+        self.img_cols = 64
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.img_size = self.img_rows * self.img_cols * self.channels
 
-        # Following parameter and optimizer set as recommended in paper
-        self.n_critic = 5
-        self.clip_value = 0.01
-        optimizer = RMSprop(lr=0.00005)
+        optimizer = Adam(0.0002, 0.5)
 
-        # Build and compile the critic
-        self.critic = self.build_critic()
-        self.critic.compile(loss=self.wasserstein_loss,
-                            optimizer=optimizer,
-                            metrics=['accuracy'])
+        # Build and compile the discriminator
+        self.discriminator = self.build_discriminator()
+        self.discriminator.compile(loss=self.wasserstein_loss,
+            optimizer=optimizer,
+            metrics=['accuracy'])
 
         # Build the generator
         self.generator = self.build_generator()
 
-        # The generator takes sketches as input and generated pictures
+        # The generator takes sketches as input and generates pictures
         z = Input(shape=(self.img_size,))
         img = self.generator(z)
 
         # For the combined model we will only train the generator
-        self.critic.trainable = False
+        self.discriminator.trainable = False
 
-        # The critic takes generated images as input and determines validity
-        valid = self.critic(img)
+        # The discriminator takes generated images as input and determines validity
+        validity = self.discriminator(img)
 
-        # The combined model  (stacked generator and critic)
-        self.combined = Model(z, valid)
-        self.combined.compile(loss=self.wasserstein_loss,
-                              optimizer=optimizer,
-                              metrics=['accuracy'])
+        # The combined model  (stacked generator and discriminator)
+        # Trains the generator to fool the discriminator
+        self.combined = Model(z, validity)
+        self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
 
     def wasserstein_loss(self, y_true, y_pred):
         return K.mean(y_true * y_pred)
@@ -60,10 +56,17 @@ class WGAN:
 
         model = Sequential()
 
-        model.add(Dense(256, input_dim=self.img_size))
+        model.add(Flatten(input_shape=self.img_shape))
+        model.add(Dense(128))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Dense(256))
         model.add(LeakyReLU(alpha=0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(512))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Dense(1024))
         model.add(LeakyReLU(alpha=0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(1024))
@@ -79,7 +82,7 @@ class WGAN:
 
         return Model(sketch, picture)
 
-    def build_critic(self):
+    def build_discriminator(self):
 
         model = Sequential()
 
@@ -98,8 +101,8 @@ class WGAN:
 
     def train(self, epochs, batch_size=128, sample_interval=50):
         # Generate the dataset
-        dataset.generate("sketches", self.img_cols, self.img_rows, 0.9)
-        dataset.generate("pictures", self.img_cols, self.img_rows, 0.9)
+        dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
+        dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
 
         # Load the dataset
         (X_train, X_test) = dataset.load("sketches")
@@ -128,41 +131,38 @@ class WGAN:
 
         for epoch in range(epochs):
 
-            for _ in range(self.n_critic):
+            # ---------------------
+            #  Train Discriminator
+            # ---------------------
 
-                # ---------------------
-                #  Train Discriminator
-                # ---------------------
+            # Select a random batch of images
+            idx = np.random.randint(0, X_train.shape[0], batch_size)
+            sketches = X_train[idx]
+            pictures = Y_train[idx]
 
-                # Select a random batch of images
-                idx = np.random.randint(0, X_train.shape[0], batch_size)
-                sketches = X_train[idx]
-                pictures = Y_train[idx]
+            # Generate a batch of new images
+            gen_imgs = self.generator.predict(sketches)
 
-                # Generate a batch of new images
-                gen_imgs = self.generator.predict(sketches)
-
-                # Train the critic
-                d_loss_real = self.critic.train_on_batch(pictures, valid)
-                d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
-                d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
-
-                # Clip critic weights
-                for l in self.critic.layers:
-                    weights = l.get_weights()
-                    weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
-                    l.set_weights(weights)
+            # Train the discriminator
+            d_loss_real = self.discriminator.train_on_batch(pictures, valid)
+            d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
+            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
             # ---------------------
             #  Train Generator
             # ---------------------
 
+            # Select a random batch of images
+            idx = np.random.randint(0, X_train.shape[0], batch_size)
+            sketches = X_train[idx]
+
+            # Train the generator (to have the discriminator label samples as valid)
             g_loss = self.combined.train_on_batch(sketches, valid)
 
             # Plot the progress
-            print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
+            print("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
-            # If at save interval => save generated image samples
+            # If at save interval => save generated image samples and models
             if epoch % sample_interval == 0:
                 self.sample_images(epoch, X_test, Y_test)
                 self.save_models(epoch)
@@ -185,47 +185,47 @@ class WGAN:
         sketches = sketches.reshape(sample_size, self.img_rows, self.img_cols, self.channels)
 
         # Make directories
-        if not os.path.exists('wgan_results/pictures/' + str(epoch)):
-            os.makedirs('wgan_results/pictures/' + str(epoch))
+        if not os.path.exists('gan_results/pictures/' + str(epoch)):
+            os.makedirs('gan_results/pictures/' + str(epoch))
 
-        if not os.path.exists('wgan_results/sketches/' + str(epoch)):
-            os.makedirs('wgan_results/sketches/' + str(epoch))
+        if not os.path.exists('gan_results/sketches/' + str(epoch)):
+            os.makedirs('gan_results/sketches/' + str(epoch))
 
-        if not os.path.exists('wgan_results/output/' + str(epoch)):
-            os.makedirs('wgan_results/output/' + str(epoch))
+        if not os.path.exists('gan_results/output/' + str(epoch)):
+            os.makedirs('gan_results/output/' + str(epoch))
 
         # Save images
         for i in range(len(sketches)):
             img = image.array_to_img(sketches[i])
-            img.save('wgan_results/sketches/' + str(epoch) + '/' + str(i) + '.png')
+            img.save('gan_results/sketches/' + str(epoch) + '/' + str(i) + '.png')
 
         for i in range(len(pictures)):
             img = image.array_to_img(pictures[i])
-            img.save('wgan_results/pictures/' + str(epoch) + '/' + str(i) + '.png')
+            img.save('gan_results/pictures/' + str(epoch) + '/' + str(i) + '.png')
 
         for i in range(len(gen_imgs)):
             img = image.array_to_img(gen_imgs[i])
-            img.save('wgan_results/output/' + str(epoch) + '/' + str(i) + '.png')
+            img.save('gan_results/output/' + str(epoch) + '/' + str(i) + '.png')
 
     def save_models(self, epoch):
         # Make directory
-        if not os.path.exists('wgan_results/models/' + str(epoch)):
-            os.makedirs('wgan_results/models/' + str(epoch))
+        if not os.path.exists('gan_results/models/' + str(epoch)):
+            os.makedirs('gan_results/models/' + str(epoch))
 
         model = self.generator.to_json()
-        with open("wgan_results/models/" + str(epoch) + "/generator.json", "w") as json_file:
+        with open("gan_results/models/" + str(epoch) + "/generator.json", "w") as json_file:
             json_file.write(model)
-        self.generator.save_weights("wgan_results/models/" + str(epoch) + "/generator.h5")
+        self.generator.save_weights("gan_results/models/" + str(epoch) + "/generator.h5")
 
-        model = self.critic.to_json()
-        with open("wgan_results/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
+        model = self.discriminator.to_json()
+        with open("gan_results/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
             json_file.write(model)
-        self.critic.save_weights("wgan_results/models/" + str(epoch) + "/discriminator.h5")
+        self.discriminator.save_weights("gan_results/models/" + str(epoch) + "/discriminator.h5")
 
 
 def test():
     wgan = WGAN()
-    wgan.train(epochs=100000, batch_size=32, sample_interval=100)
+    wgan.train(epochs=100000, batch_size=32, sample_interval=1000)
 
 
 if __name__ == '__main__':

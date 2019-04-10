@@ -17,8 +17,8 @@ import dataset
 
 class DUALGAN:
     def __init__(self):
-        self.img_rows = 192
-        self.img_cols = 128
+        self.img_rows = 96
+        self.img_cols = 64
         self.channels = 1
         self.img_dim = self.img_rows * self.img_cols
 
@@ -118,8 +118,8 @@ class DUALGAN:
 
     def train(self, epochs, batch_size=128, sample_interval=50):
         # Generate the dataset
-        dataset.generate("sketches", self.img_cols, self.img_rows, 0.9)
-        dataset.generate("pictures", self.img_cols, self.img_rows, 0.9)
+        dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
+        dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
 
         # Load the dataset
         (A_train, A_test) = dataset.load("sketches")
@@ -295,7 +295,7 @@ class DUALGAN:
 
 def test():
     gan = DUALGAN()
-    gan.train(epochs=100000, batch_size=32, sample_interval=100)
+    gan.train(epochs=100000, batch_size=32, sample_interval=1000)
 
 
 if __name__ == '__main__':

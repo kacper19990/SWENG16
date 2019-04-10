@@ -15,8 +15,8 @@ import os
 
 class GAN:
     def __init__(self):
-        self.img_rows = 192
-        self.img_cols = 128
+        self.img_rows = 96
+        self.img_cols = 64
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.img_size = self.img_rows * self.img_cols * self.channels
@@ -51,10 +51,17 @@ class GAN:
 
         model = Sequential()
 
-        model.add(Dense(256, input_dim=self.img_size))
+        model.add(Flatten(input_shape=self.img_shape))
+        model.add(Dense(128))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Dense(256))
         model.add(LeakyReLU(alpha=0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(512))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Dense(1024))
         model.add(LeakyReLU(alpha=0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(1024))
@@ -89,8 +96,8 @@ class GAN:
 
     def train(self, epochs, batch_size=128, sample_interval=50):
         # Generate the dataset
-        dataset.generate("sketches", self.img_cols, self.img_rows, 0.9)
-        dataset.generate("pictures", self.img_cols, self.img_rows, 0.9)
+        dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
+        dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
 
         # Load the dataset
         (X_train, X_test) = dataset.load("sketches")
@@ -213,7 +220,7 @@ class GAN:
 
 def test():
     gan = GAN()
-    gan.train(epochs=100000, batch_size=32, sample_interval=100)
+    gan.train(epochs=100000, batch_size=32, sample_interval=1000)
 
 
 if __name__ == '__main__':

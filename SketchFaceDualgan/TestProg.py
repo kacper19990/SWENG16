@@ -125,14 +125,14 @@ class GAN:
     def train(self, epochs, batch_size=128, sample_interval=50):
 
         # Generate the dataset
-        generate_dataset.build("dataset/img_cropped", self.img_cols, self.img_rows, 0.7)
+        generate_dataset.build("pictures", self.img_cols, self.img_rows, 0.7)
 
         # Load the dataset
-        (x_train_pic, _) = load_dataset.get("dataset/img_cropped")
+        (x_train_pic, _) = load_dataset.get("pictures")
 
-        generate_dataset.build("dataset/sktch_cropped", self.sketch_cols, self.sketch_rows, 0.7)
+        generate_dataset.build("sketches", self.sketch_cols, self.sketch_rows, 0.7)
 
-        (x_train_sketch, _) = load_dataset.get("dataset/sktch_cropped")
+        (x_train_sketch, _) = load_dataset.get("sketches")
 
         tmp = list()
 

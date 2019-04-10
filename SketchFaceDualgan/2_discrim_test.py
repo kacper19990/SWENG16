@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import generate_dataset
 import load_dataset
+import dataset
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Lambda, Concatenate
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -35,7 +36,7 @@ class GAN:
         self.second_input_shape = (2, self.sketch_rows, self.sketch_cols, self.channels)
 
         optimizer = Adam(0.0002, 0.5)
-        optimizer_2 = Adam(0.0001, 0.5)
+        optimizer_2 = Adam(0.0002, 0.5)
 
 
 
@@ -197,43 +198,40 @@ class GAN:
     def train(self, epochs, batch_size=128, sample_interval=50):
 
         # Generate the dataset
-        generate_dataset.build("dataset/img_cropped", self.img_cols, self.img_rows, 0.7)
+        dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
+        dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
 
         # Load the dataset
-        (x_train_pic, x_test_pic) = load_dataset.get("dataset/img_cropped")
-
-        generate_dataset.build("dataset/sktch_cropped", self.sketch_cols, self.sketch_rows, 0.7)
-
-        (x_train_sketch, x_test_sketch) = load_dataset.get("dataset/sktch_cropped")
-
-        tmp = list()
-
-        for i in range(0, len(x_train_pic)):
-            if (x_train_pic[i] is not None):
-                tmp.append(x_train_pic[i])
-
-        x_train_pic = np.asarray(tmp)
+        (X_train, X_test) = dataset.load("sketches")
+        (Y_train, Y_test) = dataset.load("pictures")
 
         # Rescale -1 to 1
-        x_train_pic = x_train_pic / 127.5 - 1.
-        x_train_pic = np.expand_dims(x_train_pic, axis=3)
+        X_train = X_train / 127.5 - 1.
+        X_train = np.expand_dims(X_train, axis=3)
 
-        x_test_pic = x_test_pic / 127.5 - 1.
-        x_test_pic = np.expand_dims(x_test_pic, axis=3)
+        X_test = X_test / 127.5 - 1.
+        X_test = np.expand_dims(X_test, axis=3)
 
-        # if x_train_sketch is None:
-        #     print("None\n")
-        # else:
-        #     print("Not None\n")
+        Y_train = Y_train / 127.5 - 1.
+        Y_train = np.expand_dims(Y_train, axis=3)
 
-        x_train_sketch_ls = [x for x in x_train_sketch if x is not None]
+        Y_test = Y_test / 127.5 - 1.
+        Y_test = np.expand_dims(Y_test, axis=3)
 
-        x_train_sketch = np.asarray(x_train_sketch_ls)
+        # batch_shape = (batch_size, self.img_rows, self.img_cols, self.channels)
 
-        x_train_sketch = x_train_sketch / 127.5 - 1.
+        # Reshape sketches for generator
+        X_train = X_train.reshape(len(X_train), self.img_rows, self.img_cols, self.channels)
+        X_test = X_test.reshape(len(X_test), self.img_rows, self.img_cols, self.channels)
+
         # Adversarial ground truths
-        valid = np.ones((batch_size, 1))
-        fake = np.zeros((batch_size, 1))
+        # valid = np.ones((batch_size, 1))
+        # fake = np.zeros((batch_size, 1))
+
+        valid = np.full(batch_size, 0.95)
+        fake = np.full(batch_size, 0.05)
+
+        # print(str(valid))
 
         for epoch in range(epochs):
 
@@ -242,36 +240,37 @@ class GAN:
             # ---------------------
 
             # Select a random batch of images
-            idx = np.random.randint(0, x_train_pic.shape[0], batch_size)
-            imgs = x_train_pic[idx]
+            idx = np.random.randint(0, Y_train.shape[0], batch_size)
+            imgs = Y_train[idx]
 
-            idx = np.random.randint(0, x_train_sketch.shape[0], batch_size)
-            sketches_list = x_train_sketch[idx]
+            idx = np.random.randint(0, X_train.shape[0], batch_size)
+            sketches_list = X_train[idx]
 
             sketches = self.reshape_sketches(sketches_list)
 
             gen_imgs = self.generator.predict(sketches)
 
             # Train the discriminator
-            d_loss_real = self.discriminator.train_on_batch(imgs, valid)
-            d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+            # d_loss_real = self.discriminator.train_on_batch(imgs, valid)
+            # d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
+            # d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-            if (epoch > 600) and (epoch % 2 == 0):
+            if (epoch >= 0) and (epoch % 1 == 0):
                 two_imgs_same = list()
                 imgs_dif = list()
-                for i in range(batch_size):
-                    two_imgs_same.append([imgs[i], imgs[i]])
-                    if i >= batch_size - 1:
-                        imgs_dif.append(imgs[i - 1])
-                    else:
-                        imgs_dif.append(imgs[i - 1])
+                # for i in range(batch_size):
+                #     two_imgs_same.append([imgs[i], imgs[i]])
+                #     imgs_dif.append([self.generator(imgs[i]), imgs[i]])
+                    # if i >= batch_size - 1:
+                    #     imgs_dif.append(imgs[i - 1])
+                    # else:
+                    #     imgs_dif.append(imgs[i - 1])
 
-                imgs_dif = np.asarray(imgs_dif)
-                two_imgs_same = np.asarray(two_imgs_same)
+                # imgs_dif = np.asarray(two_imgs_dif)
+                # two_imgs_same = np.asarray(two_imgs_same)
 
                 d2_loss_real = self.second_discriminator.train_on_batch([imgs, imgs], valid)
-                d2_loss_fake = self.second_combined.train_on_batch([imgs, imgs_dif], fake)
+                d2_loss_fake = self.second_combined.train_on_batch([gen_imgs, imgs], fake)
                 d2_loss = 0.5 * np.add(d2_loss_real, d2_loss_fake)
 
 
@@ -279,18 +278,18 @@ class GAN:
             #  Train Generator
             # ---------------------
 
-            idx = np.random.randint(0, x_train_sketch.shape[0], batch_size)
-            sketches_list = x_train_sketch[idx]
-            pic_list = x_train_pic[idx]
+            idx = np.random.randint(0, X_train.shape[0], batch_size)
+            sketches_list = X_train[idx]
+            pic_list = Y_train[idx]
 
             sketches = self.reshape_sketches(sketches_list)
             pics = self.reshape_sketches(pic_list)
 
             # Train the generator (to have the discriminator label samples as valid)
-            g_loss = self.combined.train_on_batch(sketches, valid)
-            print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+            # g_loss = self.combined.train_on_batch(sketches, valid)
+            # print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
-            if (epoch > 600) and (epoch % 2 == 0):
+            if (epoch >= 0) and (epoch % 1 == 0):
                 g2_loss = self.second_combined.train_on_batch([sketches, pics], valid)
                 print("%d [D2 loss: %f, acc.: %.2f%%] [G2 loss: %f]" % (epoch, d2_loss[0], 100 * d2_loss[1], g2_loss))
 
@@ -300,7 +299,7 @@ class GAN:
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
-                self.sample_images(epoch, x_train_sketch)
+                self.sample_images(epoch, X_train)
                 self.generator.save('generator.h5')
                 self.discriminator.save('discriminator.h5')
                 self.generator.save_weights('models/generator_weights.h5')
@@ -317,18 +316,18 @@ class GAN:
         sketches = self.reshape_sketches(sketches_list)
         # sketches = np.asarray(sketches_list)
         gen_imgs = self.generator.predict(sketches)
-        if not os.path.exists('output_full/' + str(epoch)):
-            os.makedirs('output_full/' + str(epoch))
-        if not os.path.exists('output_full/' + str(epoch) + '/input'):
-            os.makedirs('output_full/' + str(epoch) + '/input')
-        if not os.path.exists('output_full/' + str(epoch) + '/output'):
-            os.makedirs('output_full/' + str(epoch) + '/output')
+        if not os.path.exists('2_discrim_out/' + str(epoch)):
+            os.makedirs('2_discrim_out/' + str(epoch))
+        if not os.path.exists('2_discrim_out/' + str(epoch) + '/input'):
+            os.makedirs('2_discrim_out/' + str(epoch) + '/input')
+        if not os.path.exists('2_discrim_out/' + str(epoch) + '/output'):
+            os.makedirs('2_discrim_out/' + str(epoch) + '/output')
 
         for i in range(batch_size):
             img = image.array_to_img(gen_imgs[i])
-            img.save('output_full/' + str(epoch) + '/output/' + str(i) + '.png')
+            img.save('2_discrim_out/' + str(epoch) + '/output/' + str(i) + '.png')
             img = image.array_to_img(sketches[i])
-            img.save('output_full/' + str(epoch) + '/input/' + str(i) + '.png')
+            img.save('2_discrim_out/' + str(epoch) + '/input/' + str(i) + '.png')
 
 
         #
@@ -358,6 +357,6 @@ class GAN:
 
 if __name__ == '__main__':
     gan = GAN()
-    if not os.path.exists('output_full'):
-        os.makedirs('output_full')
-    gan.train(epochs=100000, batch_size=64, sample_interval=200)
+    if not os.path.exists('2_discrim_out'):
+        os.makedirs('2_discrim_out')
+    gan.train(epochs=200000, batch_size=32, sample_interval=200)

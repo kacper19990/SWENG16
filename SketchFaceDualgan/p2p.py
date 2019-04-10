@@ -2,7 +2,7 @@ from __future__ import print_function, division
 import scipy
 
 from keras.datasets import mnist
-from keras_contrib.layers.normalization.instancenormalization import InstanceNormalization
+from normalization.instancenormalization import InstanceNormalization
 import dataset
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Concatenate
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
@@ -10,6 +10,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
+from keras.preprocessing import image
 import datetime
 import matplotlib.pyplot as plt
 import sys
@@ -22,14 +23,14 @@ class Pix2Pix():
         # Input shape
         self.img_rows = 256
         self.img_cols = 256
-        self.channels = 3
+        self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
 
-        # Configure data loader
-        self.dataset_name = 'facades'
-        self.data_loader = DataLoader(dataset_name=self.dataset_name,
-                                      img_res=(self.img_rows, self.img_cols))
-
+        # # Configure data loader
+        # self.dataset_name = 'facades'
+        # self.data_loader = DataLoader(dataset_name=self.dataset_name,
+        #                               img_res=(self.img_rows, self.img_cols))
+        #
 
         # Calculate output shape of D (PatchGAN)
         patch = int(self.img_rows / 2**4)
@@ -115,7 +116,8 @@ class Pix2Pix():
         u6 = deconv2d(u5, d1, self.gf)
 
         u7 = UpSampling2D(size=2)(u6)
-        output_img = Conv2D(self.channels, kernel_size=4, strides=1, padding='same', activation='tanh')(u7)
+        # output_img = Conv2D(self.channels, kernel_size=4, strides=1, padding='same', activation='tanh')(u7)
+        output_img = Conv2D(self.channels, kernel_size=4, strides=1, padding='same', activation='relu')(u7)
 
         return Model(d0, output_img)
 
@@ -152,12 +154,16 @@ class Pix2Pix():
         valid = np.ones((batch_size,) + self.disc_patch)
         fake = np.zeros((batch_size,) + self.disc_patch)
 
-        dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
-        dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
+        # dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
+        # dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
+        dataset.generate("100_sketches", self.img_cols, self.img_rows, 1)
+        dataset.generate("100_pictures", self.img_cols, self.img_rows, 1)
 
         # Load the dataset
-        (X_train, X_test) = dataset.load("sketches")
-        (Y_train, Y_test) = dataset.load("pictures")
+        # (X_train, X_test) = dataset.load("sketches")
+        # (Y_train, Y_test) = dataset.load("pictures")
+        (X_train, X_test) = dataset.load("100_sketches")
+        (Y_train, Y_test) = dataset.load("100_pictures")
 
         # Rescale -1 to 1
         X_train = X_train / 127.5 - 1.
@@ -173,64 +179,68 @@ class Pix2Pix():
         Y_test = np.expand_dims(Y_test, axis=3)
 
         for epoch in range(epochs):
-            for batch_i, (imgs_A, imgs_B) in enumerate(self.data_loader.load_batch(batch_size)):
+            # for batch_i, (imgs_A, imgs_B) in enumerate(self.data_loader.load_batch(batch_size)):
+            idx = np.random.randint(0, Y_train.shape[0], batch_size)
+            imgs_B = X_train[idx]
+            imgs_A = Y_train[idx]
+            # ---------------------
+            #  Train Discriminator
+            # ---------------------
 
-                # ---------------------
-                #  Train Discriminator
-                # ---------------------
+            # Condition on B and generate a translated version
+            fake_A = self.generator.predict(imgs_B)
 
-                # Condition on B and generate a translated version
-                fake_A = self.generator.predict(imgs_B)
+            imgs_A = np.reshape(imgs_A, [np.shape(imgs_A)[0], self.img_rows, self.img_cols, self.channels])
+            # Train the discriminators (original images = real / generated = Fake)
+            d_loss_real = self.discriminator.train_on_batch([imgs_A, imgs_B], valid)
+            d_loss_fake = self.discriminator.train_on_batch([fake_A, imgs_B], fake)
+            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-                # Train the discriminators (original images = real / generated = Fake)
-                d_loss_real = self.discriminator.train_on_batch([imgs_A, imgs_B], valid)
-                d_loss_fake = self.discriminator.train_on_batch([fake_A, imgs_B], fake)
-                d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+            # -----------------
+            #  Train Generator
+            # -----------------
 
-                # -----------------
-                #  Train Generator
-                # -----------------
+            # Train the generators
+            g_loss = self.combined.train_on_batch([imgs_A, imgs_B], [valid, imgs_A])
 
-                # Train the generators
-                g_loss = self.combined.train_on_batch([imgs_A, imgs_B], [valid, imgs_A])
+            elapsed_time = datetime.datetime.now() - start_time
+            # Plot the progress
+            print ("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs,
+                                                                    d_loss[0], 100*d_loss[1],
+                                                                    g_loss[0],
+                                                                    elapsed_time))
 
-                elapsed_time = datetime.datetime.now() - start_time
-                # Plot the progress
-                print ("[Epoch %d/%d] [Batch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs,
-                                                                        batch_i, self.data_loader.n_batches,
-                                                                        d_loss[0], 100*d_loss[1],
-                                                                        g_loss[0],
-                                                                        elapsed_time))
+            # If at save interval => save generated image samples
+            if epoch % sample_interval == 0:
+                self.sample_images(epoch, X_train)
 
-                # If at save interval => save generated image samples
-                if batch_i % sample_interval == 0:
-                    self.sample_images(epoch, batch_i)
 
-    def sample_images(self, epoch, batch_i):
-        os.makedirs('images/%s' % self.dataset_name, exist_ok=True)
-        r, c = 3, 3
+    def sample_images(self, epoch, x_train_sketch):
+        r, c = 5, 5
+        # noise = np.random.normal(0, 1, (r * c, self.latent_dim))
+        batch_size = 16
+        idx = np.random.randint(0, x_train_sketch.shape[0], batch_size)
+        sketches_list = x_train_sketch[idx]
 
-        imgs_A, imgs_B = self.data_loader.load_data(batch_size=3, is_testing=True)
-        fake_A = self.generator.predict(imgs_B)
+        sketches = np.asarray(sketches_list).reshape(len(sketches_list), self.img_rows, self.img_cols, self.channels)
+        # sketches = np.asarray(sketches_list)
+        gen_imgs = self.generator.predict(sketches)
 
-        gen_imgs = np.concatenate([imgs_B, fake_A, imgs_A])
 
-        # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
+        if not os.path.exists('p2p/' + str(epoch)):
+            os.makedirs('p2p/' + str(epoch))
+        if not os.path.exists('p2p/' + str(epoch) + '/input'):
+            os.makedirs('p2p/' + str(epoch) + '/input')
+        if not os.path.exists('p2p/' + str(epoch) + '/output'):
+            os.makedirs('p2p/' + str(epoch) + '/output')
 
-        titles = ['Condition', 'Generated', 'Original']
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt])
-                axs[i, j].set_title(titles[i])
-                axs[i,j].axis('off')
-                cnt += 1
-        fig.savefig("images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
-        plt.close()
+        for i in range(batch_size):
+            img = image.array_to_img(gen_imgs[i])
+            img.save('p2p/' + str(epoch) + '/output/' + str(i) + '.png')
+            img = image.array_to_img(sketches[i])
+            img.save('p2p/' + str(epoch) + '/input/' + str(i) + '.png')
 
 
 if __name__ == '__main__':
     gan = Pix2Pix()
-    gan.train(epochs=200, batch_size=1, sample_interval=200)
+    gan.train(epochs=20000, batch_size=4, sample_interval=5)

@@ -36,7 +36,7 @@ class GAN:
         self.sketch_size = self.sketch_rows * self.sketch_cols * self.channels
         self.second_input_shape = (2, self.sketch_rows, self.sketch_cols, self.channels)
 
-        optimizer = Adam(0.0002, 0.5)
+        optimizer = Adam(0.0001, 0.5)
         # optimizer_2 = Adam(0.0001, 0.5)
 
         # Build and compile the discriminator
@@ -90,9 +90,9 @@ class GAN:
         model.add(Dense(1024))
         model.add(LeakyReLU(alpha=0.2))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(1024))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(BatchNormalization(momentum=0.8))
+        # model.add(Dense(1024))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(np.prod(self.img_shape), activation='tanh'))
         model.add(Reshape(self.img_shape))
 
@@ -120,42 +120,20 @@ class GAN:
 
         img = Input(shape=self.img_shape)
         label = Input(shape=self.sketch_shape, dtype='int32')
+        # label = Input(shape=self.sketch_shape)
 
         # label_embedding = Flatten()(Embedding(self.img_size, np.prod(self.img_shape))(label))
         label_embedding = Flatten()(Embedding(self.img_size, 1)(label))
         # label_embedding = Flatten()(Embedding(256, np.prod(self.img_shape))(label))
         flat_img = Flatten()(img)
+        # flat_label = Flatten()(label)
+        # flat_label = Reshape([1, self.img_size])(flat_label)
 
         model_input = multiply([flat_img, label_embedding])
 
         validity = model(model_input)
 
         return Model([img, label], validity)
-
-    # def build_second_discriminator(self):
-    #
-    #     # model = Sequential()
-    #
-    #     inputA = Input(shape=self.img_shape)
-    #     inputB = Input(shape=self.img_shape)
-    #
-    #     z = Concatenate()([inputA, inputB])
-    #
-    #     z = Flatten()(z)
-    #     z = Dense(512)(z)
-    #     z = LeakyReLU(alpha=0.2)(z)
-    #     z = Dense(256)(z)
-    #     z = LeakyReLU(alpha=0.2)(z)
-    #     z = Dense(1, activation='sigmoid')(z)
-    #     # model.summary()
-    #
-    #     # imgs = Input(shape=self.second_input_shape)
-    #     # validity = model(imgs)
-    #
-    #     model = Model(inputs=[inputA, inputB], outputs=z)
-    #
-    #     # return Model(imgs, validity)
-    #     return model
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
