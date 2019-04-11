@@ -1,9 +1,6 @@
 from __future__ import print_function, division
-import scipy
 
-from keras.datasets import mnist
 from normalization.instancenormalization import InstanceNormalization
-import dataset
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Concatenate
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -12,11 +9,10 @@ from keras.models import Sequential, Model
 from keras.optimizers import Adam
 from keras.preprocessing import image
 import datetime
-import matplotlib.pyplot as plt
-import sys
-from data_loader import DataLoader
+
 import numpy as np
 import os
+import dataset
 
 class Pix2Pix():
     def __init__(self):
@@ -25,12 +21,7 @@ class Pix2Pix():
         self.img_cols = 256
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
-
-        # # Configure data loader
-        # self.dataset_name = 'facades'
-        # self.data_loader = DataLoader(dataset_name=self.dataset_name,
-        #                               img_res=(self.img_rows, self.img_cols))
-        #
+        self.sample_size = 32
 
         # Calculate output shape of D (PatchGAN)
         patch = int(self.img_rows / 2**4)
@@ -154,16 +145,13 @@ class Pix2Pix():
         valid = np.ones((batch_size,) + self.disc_patch)
         fake = np.zeros((batch_size,) + self.disc_patch)
 
-        # dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
-        # dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
-        dataset.generate("100_sketches", self.img_cols, self.img_rows, 1)
-        dataset.generate("100_pictures", self.img_cols, self.img_rows, 1)
+        # Generate dataset
+        dataset.generate("sketches", self.img_cols, self.img_rows, 0.95)
+        dataset.generate("pictures", self.img_cols, self.img_rows, 0.95)
 
         # Load the dataset
-        # (X_train, X_test) = dataset.load("sketches")
-        # (Y_train, Y_test) = dataset.load("pictures")
-        (X_train, X_test) = dataset.load("100_sketches")
-        (Y_train, Y_test) = dataset.load("100_pictures")
+        (X_train, X_test) = dataset.load("sketches")
+        (Y_train, Y_test) = dataset.load("pictures")
 
         # Rescale -1 to 1
         X_train = X_train / 127.5 - 1.
@@ -172,25 +160,61 @@ class Pix2Pix():
         X_test = X_test / 127.5 - 1.
         X_test = np.expand_dims(X_test, axis=3)
 
-        y_train = Y_train / 127.5 - 1.
-        y_train = np.expand_dims(Y_train, axis=3)
+        Y_train = Y_train / 127.5 - 1.
+        Y_train = np.expand_dims(Y_train, axis=3)
 
         Y_test = Y_test / 127.5 - 1.
         Y_test = np.expand_dims(Y_test, axis=3)
 
+        # Load sample inputs
+        train_sketches = X_train[0:self.sample_size]
+        train_pictures = Y_train[0:self.sample_size]
+        test_sketches = X_test[0:self.sample_size]
+        test_pictures = Y_test[0:self.sample_size]
+
+        # Make directories
+        if not os.path.exists('p2p_results/train_sketches/'):
+            os.makedirs('p2p_results/train_sketches/')
+
+        if not os.path.exists('p2p_results/train_pictures/'):
+            os.makedirs('p2p_results/train_pictures/')
+
+        if not os.path.exists('p2p_results/test_sketches/'):
+            os.makedirs('p2p_results/test_sketches/')
+
+        if not os.path.exists('p2p_results/test_pictures/'):
+            os.makedirs('p2p_results/test_pictures/')
+
+        # Save images
+        for i in range(len(train_sketches)):
+            img = image.array_to_img(train_sketches[i])
+            img.save('p2p_results/train_sketches/' + str(i) + '.png')
+
+        for i in range(len(train_pictures)):
+            img = image.array_to_img(train_pictures[i])
+            img.save('p2p_results/train_pictures/' + str(i) + '.png')
+
+        for i in range(len(test_sketches)):
+            img = image.array_to_img(test_sketches[i])
+            img.save('p2p_results/test_sketches/' + str(i) + '.png')
+
+        for i in range(len(test_pictures)):
+            img = image.array_to_img(test_pictures[i])
+            img.save('p2p_results/test_pictures/' + str(i) + '.png')
+
         for epoch in range(epochs):
-            # for batch_i, (imgs_A, imgs_B) in enumerate(self.data_loader.load_batch(batch_size)):
-            idx = np.random.randint(0, Y_train.shape[0], batch_size)
+            # Select a random batch of images
+            idx = np.random.randint(0, X_train.shape[0], batch_size)
             imgs_B = X_train[idx]
             imgs_A = Y_train[idx]
+            
             # ---------------------
             #  Train Discriminator
             # ---------------------
 
             # Condition on B and generate a translated version
             fake_A = self.generator.predict(imgs_B)
-
-            imgs_A = np.reshape(imgs_A, [np.shape(imgs_A)[0], self.img_rows, self.img_cols, self.channels])
+            
             # Train the discriminators (original images = real / generated = Fake)
             d_loss_real = self.discriminator.train_on_batch([imgs_A, imgs_B], valid)
             d_loss_fake = self.discriminator.train_on_batch([fake_A, imgs_B], fake)
@@ -210,37 +234,65 @@ class Pix2Pix():
                                                                     g_loss[0],
                                                                     elapsed_time))
 
-            # If at save interval => save generated image samples
+            # If at save interval => save images and models
             if epoch % sample_interval == 0:
-                self.sample_images(epoch, X_train)
+                self.sample_train_images(epoch, X_train, Y_train)
+                self.sample_test_images(epoch, X_test, Y_test)
+                self.save_models(epoch)
 
+    def sample_train_images(self, epoch, X_train, Y_train):
+        sketches = X_train[0:self.sample_size]
+        gen_imgs = self.generator.predict(sketches)
+    
+        # Rescale images 0 - 1
+        gen_imgs = 0.5 * gen_imgs + 0.5
+    
+        # Make directories
+        if not os.path.exists('p2p_results/train_output/' + str(epoch)):
+            os.makedirs('p2p_results/train_output/' + str(epoch))
+    
+        # Save images
+        for i in range(len(gen_imgs)):
+            img = image.array_to_img(gen_imgs[i])
+            img.save('p2p_results/train_output/' + str(epoch) + '/' + str(i) + '.png')
 
-    def sample_images(self, epoch, x_train_sketch):
-        r, c = 5, 5
-        # noise = np.random.normal(0, 1, (r * c, self.latent_dim))
-        batch_size = 16
-        idx = np.random.randint(0, x_train_sketch.shape[0], batch_size)
-        sketches_list = x_train_sketch[idx]
-
-        sketches = np.asarray(sketches_list).reshape(len(sketches_list), self.img_rows, self.img_cols, self.channels)
-        # sketches = np.asarray(sketches_list)
+    def sample_test_images(self, epoch, X_test, Y_test):
+        sketches = X_test[0:self.sample_size]
         gen_imgs = self.generator.predict(sketches)
 
+        # Rescale images 0 - 1
+        gen_imgs = 0.5 * gen_imgs + 0.5
 
-        if not os.path.exists('p2p/' + str(epoch)):
-            os.makedirs('p2p/' + str(epoch))
-        if not os.path.exists('p2p/' + str(epoch) + '/input'):
-            os.makedirs('p2p/' + str(epoch) + '/input')
-        if not os.path.exists('p2p/' + str(epoch) + '/output'):
-            os.makedirs('p2p/' + str(epoch) + '/output')
+        # Make directories
+        if not os.path.exists('p2p_results/test_output/' + str(epoch)):
+            os.makedirs('p2p_results/test_output/' + str(epoch))
 
-        for i in range(batch_size):
+        # Save images
+        for i in range(len(gen_imgs)):
             img = image.array_to_img(gen_imgs[i])
-            img.save('p2p/' + str(epoch) + '/output/' + str(i) + '.png')
-            img = image.array_to_img(sketches[i])
-            img.save('p2p/' + str(epoch) + '/input/' + str(i) + '.png')
+            img.save('p2p_results/test_output/' + str(epoch) + '/' + str(i) + '.png')
+            
+    def save_models(self, epoch):
+        # Make directory
+        if not os.path.exists('p2p_results/models/' + str(epoch)):
+            os.makedirs('p2p_results/models/' + str(epoch))
+
+        # Save models
+        model = self.generator.to_json()
+        with open("p2p_results/models/" + str(epoch) + "/generator.json", "w") as json_file:
+            json_file.write(model)
+        self.generator.save_weights("p2p_results/models/" + str(epoch) + "/generator.h5")
+
+        model = self.discriminator.to_json()
+        with open("p2p_results/models/" + str(epoch) + "/discriminator.json", "w") as json_file:
+            json_file.write(model)
+        self.discriminator.save_weights("p2p_results/models/" + str(epoch) + "/discriminator.h5")
+
+
+def test():
+    gan = Pix2Pix()
+    gan.train(epochs=20000, batch_size=4, sample_interval=20)
 
 
 if __name__ == '__main__':
-    gan = Pix2Pix()
-    gan.train(epochs=20000, batch_size=4, sample_interval=5)
+    test()

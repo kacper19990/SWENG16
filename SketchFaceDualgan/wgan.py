@@ -17,8 +17,8 @@ import os
 
 class WGAN:
     def __init__(self):
-        self.img_rows = 96
-        self.img_cols = 64
+        self.img_rows = 192
+        self.img_cols = 128
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.img_size = self.img_rows * self.img_cols * self.channels
@@ -225,7 +225,7 @@ class WGAN:
 
 def test():
     wgan = WGAN()
-    wgan.train(epochs=100000, batch_size=32, sample_interval=1000)
+    wgan.train(epochs=20000, batch_size=32, sample_interval=200)
 
 
 if __name__ == '__main__':
